@@ -1,0 +1,63 @@
+version: "3.7"
+
+services:
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    restart: unless-stopped
+    ports:
+      - ${NGINX_PORT}:80
+    volumes:
+      - ./src:/var/www:rw # With read/write access
+      - ./nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf:ro # With read-only access
+    networks:
+      - dockerized-laravel-network
+    links:
+      - laravel
+
+  mysql:
+    container_name: mysql
+    build:
+      context: ./mysql
+    restart: unless-stopped
+    volumes:
+      - mysql:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d
+    networks:
+      - dockerized-laravel-network
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DB}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      TZ: ${TIMEZONE}
+
+  laravel:
+    container_name: laravel
+    restart: unless-stopped
+    build:
+      context: ./laravel
+      args:
+        PHP_VERSION: ${PHP_VERSION}
+        TIMEZONE: ${TIMEZONE}
+        RUN_QUEUE: ${RUN_QUEUE}
+        COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME}
+    volumes:
+      - ./src:/var/www/
+      - ./php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    working_dir: /var/www
+    networks:
+      - dockerized-laravel-network
+    links:
+      - mysql
+
+networks:
+  dockerized-laravel-network:
+    driver: bridge
+
+volumes:
+  mysql:
+    name: mysql_vol
+    driver: local
